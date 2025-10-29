@@ -179,7 +179,7 @@ static inline int32_t j_imm(uint32_t raw) {
     int32_t imm = (imm_10_5 << 5) | (imm_20 << 20) | (imm_4_1 << 1) |
                   (imm_11 << 11) | (imm_19_12) << 12;
     /* If immediate is negative, do sign extension */
-    if (imm & 0x800) imm |= 0xfffff000;
+    if (imm & 0x80000) imm |= 0xfff00000;
 
     return imm;
 }
@@ -257,6 +257,7 @@ void cpu_execute(cpu_t* cpu, uint32_t raw) {
         case JALR: {
             int32_t imm = i_imm(raw);
             uint32_t target = (cpu->regs[inst.rs1] + imm) & ~1;
+            check_addr(target);
             cpu->regs[inst.rd] = cpu->pc;
             cpu->pc = target;
             return; /* Don't increment PC */
@@ -264,12 +265,9 @@ void cpu_execute(cpu_t* cpu, uint32_t raw) {
 
         case JAL: {
             int32_t imm = j_imm(raw);
-            /**
-             * Since the program counter (pc) has already advanced to the next
-             * instruction, we need to subtract one instruction (4 bytes) to
-             * correctly compute the target address.
-             */
-            uint32_t target = (cpu->pc - 4 + imm) & ~1;
+            uint32_t target = (cpu->pc - 4 + imm);
+            if (target & 0x1u) fatal("instruction-address-misaligned\n");
+            check_addr(target);
             cpu->regs[inst.rd] = cpu->pc;
             cpu->pc = target;
             return;
